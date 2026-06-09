@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rims Match</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 30px;
+            background: #f5f5f5;
+        }
+
+        canvas {
+            border: 2px solid black;
+            background: white;
+            touch-action: none;
+        }
+
+        .toolbar {
+            margin-bottom: 15px;
+        }
+
+        button,
+        input[type=file] {
+            margin: 5px;
+            padding: 8px 14px;
+        }
+
+        #loadingOverlay {
+
+            position: fixed;
+
+            top: 0;
+
+            left: 0;
+
+            width: 100%;
+
+            height: 100%;
+
+            background: rgba(255, 255, 255, 0.8);
+
+            display: none;
+
+            justify-content: center;
+
+            align-items: center;
+
+            flex-direction: column;
+
+            z-index: 9999;
+
+        }
+
+        .spinner {
+
+            width: 60px;
+
+            height: 60px;
+
+            border: 6px solid #ddd;
+
+            border-top: 6px solid #3498db;
+
+            border-radius: 50%;
+
+            animation: spin 1s linear infinite;
+
+            margin-bottom: 15px;
+
+        }
+
+        @keyframes spin {
+
+            to {
+
+                transform: rotate(360deg);
+
+            }
+
+        }
+    </style>
+</head>
+<div id="loadingOverlay" style="display:none;">
+
+    <div class="spinner"></div>
+
+    <p>Uploading...</p>
+
+</div>
+
+<body>
+
+    <h1>Rims Match</h1>
+
+    {% csrf_token %}
+
+    <div class="toolbar">
+        <input type="file" id="upload" accept="image/*">
+
+        <button type="button" id="clearBtn">
+            Clear
+        </button>
+
+        <button type="button" id="submitBtn">
+            Submit
+        </button>
+    </div>
+
+    <canvas id="canvas" width="800" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "black";
+
+        let drawing = false;
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+
+            if (e.touches) {
+                return {
+                    x: e.touches[0].clientX - rect.left,
+                    y: e.touches[0].clientY - rect.top
+                };
+            }
+
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        canvas.onmousedown = e => {
+            drawing = true;
+            const p = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        };
+
+        canvas.onmousemove = e => {
+            if (!drawing) return;
+
+            const p = getPos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+        };
+
+        window.onmouseup = () => drawing = false;
+
+        canvas.addEventListener("touchstart", e => {
+            drawing = true;
+            const p = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        });
+
+        canvas.addEventListener("touchmove", e => {
+            e.preventDefault();
+
+            if (!drawing) return;
+
+            const p = getPos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener("touchend", () => {
+            drawing = false;
+        });
+
+        document.getElementById("clearBtn").onclick = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+
+        document.getElementById("upload").onchange = function () {
+
+            const file = this.files[0];
+            if (!file) return;
+
+            const img = new Image();
+
+            img.onload = () => {
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const scale = Math.min(
+                    canvas.width / img.width,
+                    canvas.height / img.height
+                );
+
+                const w = img.width * scale;
+                const h = img.height * scale;
+
+                ctx.drawImage(
+                    img,
+                    (canvas.width - w) / 2,
+                    (canvas.height - h) / 2,
+                    w,
+                    h
+                );
+            };
+
+            img.src = URL.createObjectURL(file);
+        };
+
+        document.getElementById("submitBtn").onclick = () => {
+
+            // Show loading overlay
+            document.getElementById("loadingOverlay").style.display = "flex";
+
+            canvas.toBlob(async blob => {
+
+                const formData = new FormData();
+
+                formData.append(
+                    "csrfmiddlewaretoken",
+                    document.querySelector(
+                        "[name=csrfmiddlewaretoken]"
+                    ).value
+                );
+
+                formData.append("title", "upload");
+                formData.append("image", blob, "drawing.png");
+
+                try {
+                    const response = await fetch("/rims/upload", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    const html = await response.text();
+
+                    document.open();
+                    document.write(html);
+                    document.close();
+
+                } catch (err) {
+                    // Hide loading if an error occurs
+                    document.getElementById("loadingOverlay").style.display = "none";
+                    alert("Upload failed.");
+                    console.error(err);
+                }
+
+            }, "image/png");
+
+        };
+    </script>
+
+</body>
+
+</html>

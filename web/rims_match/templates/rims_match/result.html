@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Results</title>
+</head>
+<style>
+    button {
+        margin: 5px;
+        padding: 8px 14px;
+    }
+</style>
+
+<body>
+
+    <h1>Results</h1>
+
+    <ul id="results-list"></ul>
+
+    {{ results|json_script:"results-data" }}
+
+    <script>
+        // Load the dictionary from Django
+        const results = JSON.parse(
+            document.getElementById("results-data").textContent
+        );
+
+        const list = document.getElementById("results-list");
+        // Convert dictionary to array and sort descending by value
+
+        const sortedEntries = Object.entries(results).sort(
+
+            (a, b) => b[1] - a[1]
+
+        );
+        // Loop through every item in the dictionary
+        for (const [key, value] of sortedEntries) {
+            const li = document.createElement("li");
+            li.textContent = `${key}: ${value}`;
+            list.appendChild(li);
+            const img = document.createElement("img");
+
+            img.src = `/static/images/${key}`;
+
+            img.alt = key;
+
+            img.width = 100;
+            list.appendChild(img);
+
+            
+        }
+    </script>
+    <button onclick="window.location.reload();">
+
+        Back
+
+    </button>
+</body>
+
+</html>
